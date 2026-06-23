@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EMA PMS Explorer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #eeecea;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --border: #e0deda;
+    --accent: #1a1a18;
+    --success-bg: #eaf3de;
+    --success: #3b6d11;
+    --error-bg: #fcebeb;
+    --error: #a32d2d;
+    --info-bg: #e6f1fb;
+    --info: #185fa5;
+    --active-bg: #eaf3de;
+    --active: #3b6d11;
+    --withdrawn-bg: #fcebeb;
+    --withdrawn: #a32d2d;
+    --radius: 8px;
+    --mono: 'Courier New', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #e8e6e0;
+      --text2: #9a9890;
+      --border: #3a3a36;
+      --accent: #e8e6e0;
+      --success-bg: #173404;
+      --success: #c0dd97;
+      --error-bg: #501313;
+      --error: #f09595;
+      --info-bg: #042c53;
+      --info: #b5d4f4;
+      --active-bg: #173404;
+      --active: #c0dd97;
+      --withdrawn-bg: #501313;
+      --withdrawn: #f09595;
+    }
+  }
+
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  .header h1 { font-size: 22px; font-weight: 500; color: var(--text); }
+  .header p { font-size: 14px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .card-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2); margin-bottom: 14px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .full { grid-column: 1 / -1; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--text2); font-weight: 500; }
+  .field input, .field select {
+    font-size: 13px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input[type="password"] { font-family: var(--mono); }
+  .field input:focus, .field select:focus { border-color: var(--text2); }
+
+  .search-row { display: grid; grid-template-columns: 160px 1fr 120px auto; gap: 10px; align-items: flex-end; }
+
+  .btn {
+    font-size: 13px; font-weight: 500; padding: 9px 18px;
+    border-radius: var(--radius); border: none; cursor: pointer;
+    transition: opacity 0.15s; white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { opacity: 0.8; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-secondary { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+
+  .toggle-btn { font-size: 12px; color: var(--text2); cursor: pointer; background: none; border: none; padding: 0; text-decoration: underline; font-family: var(--sans); }
+
+  .status {
+    font-size: 13px; padding: 10px 14px; border-radius: var(--radius);
+    margin-bottom: 16px; display: none;
+  }
+  .status.info { background: var(--info-bg); color: var(--info); display: block; }
+  .status.error { background: var(--error-bg); color: var(--error); display: block; }
+  .status.success { background: var(--success-bg); color: var(--success); display: block; }
+
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .results-count { font-size: 13px; color: var(--text2); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: var(--bg2); }
+  th { text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg2); }
+
+  .id-cell { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-active { background: var(--active-bg); color: var(--active); }
+  .badge-withdrawn { background: var(--withdrawn-bg); color: var(--withdrawn); }
+  .badge-other { background: var(--bg3); color: var(--text2); }
+
+  .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .page-info { font-size: 12px; color: var(--text2); }
+  .page-btns { display: flex; gap: 8px; }
+
+  .hidden { display: none; }
+
+  .creds-toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .creds-toggle-row span { font-size: 13px; color: var(--text2); }
+
+  .conn-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+  .dot.connected { background: var(--success); }
+
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>EMA PMS Explorer</h1>
+    <p>Search medicinal products from the EMA Product Management Service public API.<br>
+    Enter your OAuth2 credentials to connect, then search by product name, substance, ID, or country.</p>
+  </div>
+
+  <div class="creds-toggle-row">
+    <div class="conn-status">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-label">Not connected</span>
+    </div>
+    <button class="toggle-btn" onclick="toggleCreds()">⚙ Configure credentials</button>
+  </div>
+
+  <div class="card hidden" id="creds-card">
+    <div class="card-title">OAuth2 credentials</div>
+    <div class="grid-2">
+      <div class="field full">
+        <label>Token URL</label>
+        <input type="text" id="token-url" placeholder="https://login.microsoftonline.com/.../oauth2/v2.0/token"/>
+      </div>
+      <div class="field full">
+        <label>Scope</label>
+        <input type="text" id="scope" placeholder="api://euema.onmicrosoft.com/upd-apim-secured/.default"/>
+      </div>
+      <div class="field">
+        <label>Client ID</label>
+        <input type="text" id="client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+      </div>
+      <div class="field">
+        <label>Client Secret</label>
+        <input type="password" id="client-secret" placeholder="Your client secret"/>
+      </div>
+    </div>
+    <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+      <button class="btn btn-primary" onclick="connect()">Connect</button>
+      <span id="connect-status" style="font-size:12px; color:var(--text2)"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Search</div>
+    <div class="search-row">
+      <div class="field">
+        <label>Search by</label>
+        <select id="search-type" onchange="updatePlaceholder()">
+          <option value="name">Product name</option>
+          <option value="substance">Substance (SMS ID)</option>
+          <option value="identifier">PMS ID</option>
+          <option value="country">Country (RMS ID)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Value</label>
+        <input type="text" id="search-value" placeholder="e.g. aspirin" onkeydown="if(event.key==='Enter') doSearch()"/>
+      </div>
+      <div class="field">
+        <label>Results / page</label>
+        <select id="count">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="search-btn" onclick="doSearch()">Search</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div id="results-section" class="hidden">
+    <div class="results-header">
+      <span class="results-count" id="results-count"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PMS ID</th>
+            <th>Product name</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span class="page-info" id="page-info"></span>
+      <div class="page-btns">
+        <button class="btn btn-secondary" id="prev-btn" onclick="prevPage()" disabled>← Prev</button>
+        <button class="btn btn-secondary" id="next-btn" onclick="nextPage()" disabled>Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    EMA PMS Public API — Data sourced from the European Medicines Agency. Credentials expire on 06/23/2028.
+  </footer>
+
+</div>
+
+<script>
+const BASE_URL = "https://api.pms.ema.europa.eu/public/v1";
+const STATUS_MAP = {
+  "200000005004": "withdrawn",
+  "200000005005": "active",
+  "200000005006": "suspended",
+  "200000005007": "refused",
+  "200000005008": "expired"
+};
+
+let token = null;
+let tokenExpiry = 0;
+let currentPage = 1;
+let nextToken = null;
+let prevTokens = [];
+let allEntries = [];
+
+function toggleCreds() {
+  document.getElementById('creds-card').classList.toggle('hidden');
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+function hideStatus() {
+  document.getElementById('status').className = 'status';
+}
+
+function setConnected(ok) {
+  document.getElementById('conn-dot').className = 'dot' + (ok ? ' connected' : '');
+  document.getElementById('conn-label').textContent = ok ? 'Connected' : 'Not connected';
+}
+
+function updatePlaceholder() {
+  const map = {
+    name: 'e.g. aspirin',
+    substance: 'e.g. 100000090365  (ibuprofen SMS ID)',
+    identifier: 'e.g. 600001772175',
+    country: 'e.g. 100000000388  (Spain RMS ID)'
+  };
+  document.getElementById('search-value').placeholder = map[document.getElementById('search-type').value];
+}
+
+async function getToken() {
+  if (token && Date.now() < tokenExpiry) return token;
+  const tokenUrl = document.getElementById('token-url').value.trim();
+  const clientId = document.getElementById('client-id').value.trim();
+  const clientSecret = document.getElementById('client-secret').value.trim();
+  const scope = document.getElementById('scope').value.trim();
+  if (!tokenUrl || !clientId || !clientSecret) throw new Error('Configure your credentials first.');
+
+  const resp = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret, scope })
+  });
+  if (!resp.ok) throw new Error('Authentication failed. Check your credentials.');
+  const data = await resp.json();
+  token = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return token;
+}
+
+async function connect() {
+  const btn = document.querySelector('#creds-card .btn-primary');
+  const statusEl = document.getElementById('connect-status');
+  btn.disabled = true;
+  btn.textContent = 'Connecting...';
+  statusEl.textContent = '';
+  token = null;
+  try {
+    await getToken();
+    setConnected(true);
+    statusEl.textContent = 'Connected. Token valid for 1 hour.';
+    statusEl.style.color = 'var(--success)';
+    setTimeout(() => document.getElementById('creds-card').classList.add('hidden'), 1200);
+  } catch(e) {
+    setConnected(false);
+    statusEl.textContent = e.message;
+    statusEl.style.color = 'var(--error)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Connect';
+  }
+}
+
+function getStatusBadge(statusObj) {
+  if (!statusObj?.coding) return '<span class="badge badge-other">unknown</span>';
+  const code = statusObj.coding[0]?.code;
+  const label = STATUS_MAP[code] || code || 'unknown';
+  const cls = label === 'active' ? 'badge-active' : label === 'withdrawn' ? 'badge-withdrawn' : 'badge-other';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+async function doSearch(ct = null) {
+  const type = document.getElementById('search-type').value;
+  const value = document.getElementById('search-value').value.trim();
+  const count = document.getElementById('count').value;
+  if (!value) { showStatus('Enter a search value.', 'error'); return; }
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  hideStatus();
+
+  try {
+    const tok = await getToken();
+    setConnected(true);
+    const params = new URLSearchParams({ _count: count });
+    if (ct) params.set('_ct', ct);
+    if (type === 'name') params.set('name', value);
+    else if (type === 'substance') params.set('_has:Ingredient:for:substance-code', value);
+    else if (type === 'identifier') params.set('identifier', value);
+    else if (type === 'country') params.set('country', value);
+
+    const resp = await fetch(`${BASE_URL}/MedicinalProductDefinition?${params}`, {
+      headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.issue?.[0]?.diagnostics || `Error ${resp.status}`);
+    }
+    const data = await resp.json();
+    allEntries = data.entry || [];
+    const nextLink = data.link?.find(l => l.relation === 'next');
+    nextToken = nextLink ? new URL(nextLink.url).searchParams.get('_ct') : null;
+    renderResults(allEntries, data.total);
+  } catch(e) {
+    showStatus(e.message, 'error');
+    document.getElementById('results-section').classList.add('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+function renderResults(entries, total) {
+  if (!entries.length) { showStatus('No products found.', 'info'); document.getElementById('results-section').classList.add('hidden'); return; }
+  document.getElementById('results-section').classList.remove('hidden');
+  document.getElementById('results-count').textContent = total ? `${total.toLocaleString()} total results` : `${entries.length} results`;
+  document.getElementById('results-body').innerHTML = entries.map(e => {
+    const r = e.resource || {};
+    return `<tr>
+      <td class="id-cell">${r.id || '-'}</td>
+      <td>${r.name?.[0]?.productName || '-'}</td>
+      <td>${getStatusBadge(r.status)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('prev-btn').disabled = prevTokens.length === 0;
+  document.getElementById('next-btn').disabled = !nextToken;
+  document.getElementById('page-info').textContent = `Page ${currentPage}`;
+}
+
+function nextPage() {
+  if (!nextToken) return;
+  prevTokens.push(nextToken);
+  currentPage++;
+  doSearch(nextToken);
+}
+
+function prevPage() {
+  if (!prevTokens.length) return;
+  prevTokens.pop();
+  currentPage--;
+  doSearch(prevTokens[prevTokens.length - 1] || null);
+}
+
+function exportCSV() {
+  const rows = [['PMS ID', 'Product Name', 'Status']];
+  allEntries.forEach(e => {
+    const r = e.resource || {};
+    const code = r.status?.coding?.[0]?.code || '';
+    rows.push([r.id || '', `"${(r.name?.[0]?.productName || '').replace(/"/g,'""')}"`, STATUS_MAP[code] || code]);
+  });
+  const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ema_results.csv'; a.click();
+}
+</script>
+</body>
+</html>
